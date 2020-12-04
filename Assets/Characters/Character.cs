@@ -14,9 +14,12 @@ public class Character : MonoBehaviour
     private bool m_Jumping = false;
     private bool m_Punching = false;
     private bool m_Walking = false;
+    private bool m_Crouching = false;
+    private bool m_Dead = false;
+
     private float punchTimer = 0f;
     private bool dealDamage = false;
-    private int damage = 30;
+    private int damage = 100;
     
     private Quaternion rot = new Quaternion();
 
@@ -36,6 +39,7 @@ public class Character : MonoBehaviour
     [SerializeField] private KeyCode left = KeyCode.A;
     [SerializeField] private KeyCode right = KeyCode.D;
     [SerializeField] private KeyCode punch = KeyCode.LeftControl;
+    [SerializeField] private KeyCode crouch = KeyCode.S;
 
     //[Header("HitBoxes")]
 
@@ -53,6 +57,9 @@ public class Character : MonoBehaviour
     public void TakeDamage(int damage)
     {
         health -= damage;
+
+        if (health <= 0)
+            m_Dead = true;
     }
 
     public void Punch(bool left)
@@ -77,29 +84,39 @@ public class Character : MonoBehaviour
             nextMove.y += jumpHeight;
         }
 
-        if (Input.GetKey(right))
+        if (Input.GetKey(crouch) && m_OnGround)
         {
-            if (!m_Jumping) m_Walking = true;
-
-            rot.eulerAngles = new Vector3(0, 0, 0);
-            transform.rotation = rot;
-            //spriteControl.flipX = false;
-
-            if ((physicsControl.velocity.x + moveSpeed) <= maxMoveSpeed)
-                nextMove.x += moveSpeed;
+            m_Crouching = true;
+            m_Walking = false;
         }
-        else if (Input.GetKey(left))
+        else
         {
-            if (!m_Jumping) m_Walking = true;
+            m_Crouching = false;
 
-            rot.eulerAngles = new Vector3(0, 180, 0);
-            transform.rotation = rot;
-            //spriteControl.flipX = true;
+            if (Input.GetKey(right))
+            {
+                if (!m_Jumping) m_Walking = true;
 
-            if ((physicsControl.velocity.x - moveSpeed) >= -maxMoveSpeed)
-                nextMove.x -= moveSpeed;
+                rot.eulerAngles = new Vector3(0, 0, 0);
+                transform.rotation = rot;
+                //spriteControl.flipX = false;
+
+                if ((physicsControl.velocity.x + moveSpeed) <= maxMoveSpeed)
+                    nextMove.x += moveSpeed;
+            }
+            else if (Input.GetKey(left))
+            {
+                if (!m_Jumping) m_Walking = true;
+
+                rot.eulerAngles = new Vector3(0, 180, 0);
+                transform.rotation = rot;
+                //spriteControl.flipX = true;
+
+                if ((physicsControl.velocity.x - moveSpeed) >= -maxMoveSpeed)
+                    nextMove.x -= moveSpeed;
+            }
+            else m_Walking = false;
         }
-        else m_Walking = false;
 
         if (Input.GetKeyDown(punch) && !m_Punching)
         {
@@ -116,16 +133,30 @@ public class Character : MonoBehaviour
         physicsControl.AddForce(nextMove);
         nextMove = Vector2.zero;
 
-        animControl.SetBool("jumping", !m_Punching && !m_Punching && m_Jumping);
-        animControl.SetBool("walking", !m_Punching && !m_Jumping && m_Walking);
+        animControl.SetBool("jumping", !m_Punching && m_Jumping || m_Punching && m_Jumping);
+        animControl.SetBool("walking", !m_Punching && !m_Jumping && m_Walking || m_Jumping && m_Walking);
         animControl.SetBool("punching", m_Punching);
+        animControl.SetBool("crouching", m_Crouching);
+        animControl.SetBool("dead", m_Dead);
     }
 
     void Update()
     {
-        Move();
+        if (!m_Dead)
+        {
+            Move();
 
-        hpText.text = "HP: " + health;
+            hpText.text = "HP: " + health;
+        }
+        else
+        {
+            animControl.SetBool("jumping", false);
+            animControl.SetBool("walking", false);
+            animControl.SetBool("punching", false);
+            animControl.SetBool("crouching", false);
+            animControl.SetBool("dead", m_Dead);
+            hpText.text = "K.O";
+        }
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
